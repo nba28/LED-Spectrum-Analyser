@@ -603,6 +603,12 @@ static void TestEngineTextAndArt()
 	CHECK_NEAR( e.TextOpacity( 100 + kTextDisplayTime + kFadeTime / 2 ), 0.5, 1e-9 );
 	CHECK_NEAR( e.TextOpacity( 100 + kTextDisplayTime + kFadeTime + 1 ), 0, 0 );
 
+	// a title that is just sitting there needs no frames; its fade does
+	
+	CHECK( ! e.IsAnimating( 105 ));
+	CHECK( e.IsAnimating( 100 + kTextDisplayTime + 0.5 ));
+	CHECK( ! e.IsAnimating( 100 + kTextDisplayTime + kFadeTime + 1 ));
+	
 	e.GetSettings().keepTextVisible = true;
 	CHECK_NEAR( e.TextOpacity( 1000 ), 1, 0 );
 	e.GetSettings().keepTextVisible = false;
@@ -626,6 +632,10 @@ static void TestEngineTextAndArt()
 	e.SetArtwork( true, NULL, 400 );
 	CoverArtState c = e.CoverArt( 403 );
 	CHECK( c.opacity == 1 && c.centred == 1 );
+	e.SetPlaying( false, 403 );
+	CHECK( ! e.IsAnimating( 403 ));
+	CHECK( e.IsAnimating( 400 + kCoverDisplayTime + 0.5 ));
+	e.SetPlaying( true, 403 );
 	c = e.CoverArt( 400 + kCoverDisplayTime + kFadeTime + 1 );
 	CHECK( c.opacity == 0 );
 

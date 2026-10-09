@@ -402,21 +402,29 @@ double		Engine::FeedbackOpacity( double now ) const
 }
 
 
+static inline bool	InWindow( double t, double start, double length )
+{
+	return t >= start - 0.15 && t < start + length + 0.15;
+}
+
+
 bool		Engine::IsAnimating( double now ) const
 {
+	// only things that actually change on screen count: text and artwork that is merely showing
+	// doesn't need frames, only its fades do
+	
 	if ( playing || showDiagnostics || settings.animateColours )
 		return true;
-
-	double textT = now - textChangedAt;
-	if ( ! settings.keepTextVisible && textT >= 0 && textT < kTextDisplayTime + kFadeTime + 0.1 )
+	
+	if ( ! settings.keepTextVisible && InWindow( now - textChangedAt, kTextDisplayTime, kFadeTime ))
 		return true;
-
-	if ( hasArtwork && now - artworkAt < kCoverDisplayTime + kFadeTime + 0.1 )
+	
+	if ( hasArtwork && settings.coverArt && InWindow( now - artworkAt, kCoverDisplayTime, kFadeTime ))
 		return true;
-
-	if ( FeedbackOpacity( now ) > 0 )
+	
+	if ( ! feedback.empty() && InWindow( now - feedbackAt, kFeedbackTime - kFadeTime, kFadeTime ))
 		return true;
-
+	
 	for ( int c = 0; c < 2; c++ )
 	{
 		if ( vuBars[c].Value() > 0 || vuBars[c].Peak() > 0 )
