@@ -14,11 +14,12 @@ namespace led
 {
 
 Engine::Engine( EngineHost* theHost )
-	: host( theHost ), bandMap( 18 ), playing( false ), textChangedAt( -1e9 ), savedInfoMask( kInfoTitle | kInfoArtist ),
+	: host( theHost ), bandMap( 18 ), playing( false ), lastSpectrumChannels( 0 ), lastWaveformChannels( 0 ),
+	  haveLastData( false ), dataFrozen( false ), dataChangedAt( -1e9 ), changesInRow( 0 ), textChangedAt( -1e9 ), savedInfoMask( kInfoTitle | kInfoArtist ),
 	  positionMS( 0 ), positionAt( 0 ), hasArtwork( false ), hasArtworkColours( false ), artworkAt( -1e9 ), artworkSerial( 0 ),
 	  paletteSerial( 1 ), animationStart( 0 ), randomSeed( 1 ), layoutSerial( 1 ), feedbackAt( -1e9 ), currentPreset( 0 ),
 	  showDiagnostics( false ), hostVersion( 0 ), apiMajor( 0 ), apiMinor( 0 ), sampleRate( 0 ), audioChannels( 0 ),
-	  windowStart( -1 ), pulses( 0 ), dataPulses( 0 ), frames( 0 ), waveformPulses( 0 ), pulseRate( 0 ), dataRate( 0 ),
+	  windowStart( -1 ), pulses( 0 ), dataPulses( 0 ), frozenPulses( 0 ), frames( 0 ), waveformPulses( 0 ), pulseRate( 0 ), dataRate( 0 ), frozenRate( 0 ),
 	  frameRate( 0 ), spectrumPeakEntry( -1 ), vuFromWaveform( false )
 {
 	artworkColours = AnalyseArtwork( NULL, 0, 0, 0 );
@@ -29,6 +30,8 @@ Engine::Engine( EngineHost* theHost )
 		spectrumMax[c] = 0;
 	}
 	memset( peakEntryVotes, 0, sizeof( peakEntryVotes ));
+	memset( lastSpectrum, 0, sizeof( lastSpectrum ));
+	memset( lastWaveform, 0, sizeof( lastWaveform ));
 
 	settings.Validate();
 	bandMap = BandMap( settings.numberOfSpectrumBars );
@@ -114,6 +117,12 @@ void		Engine::SetAudioFormat( double rate, uint32_t channels )
 
 void		Engine::SetPlaying( bool isPlaying, double now )
 {
+	// the track info shows again whenever playback starts, not only when the track changes: iTunes
+	// sends the info when a track is selected, which may be long before it is played
+
+	if ( isPlaying && ! playing && textChangedAt > -1e8 )
+		textChangedAt = now;
+
 	playing = isPlaying;
 
 	if ( ! playing )
@@ -153,6 +162,44 @@ void		Engine::SetArtwork( bool has, const ArtworkColours* colours, double now )
 }
 
 
+// remembers the data, and returns true if it is a stale repeat that the meters should ignore
+
+bool		Engine::NoteData( const uint8_t ( *spectrum )[kSpectrumEntries], int spectrumChannels,
+							  const uint8_t ( *waveform )[kWaveformEntries], int waveformChannels, double now )
+{
+	if ( ! spectrum && ! waveform )
+		return false;
+
+	int ns = spectrum? std::min( spectrumChannels, 2 ) : 0;
+	int nw = waveform? std::min( waveformChannels, 2 ) : 0;
+
+	bool same = haveLastData && ns == lastSpectrumChannels && nw == lastWaveformChannels &&
+				( ns == 0 || memcmp( spectrum, lastSpectrum, ns * kSpectrumEntries ) == 0 ) &&
+				( nw == 0 || memcmp( waveform, lastWaveform, nw * kWaveformEntries ) == 0 );
+
+	if ( ! same )
+	{
+		if ( ns )
+			memcpy( lastSpectrum, spectrum, ns * kSpectrumEntries );
+		if ( nw )
+			memcpy( lastWaveform, waveform, nw * kWaveformEntries );
+
+		lastSpectrumChannels = ns;
+		lastWaveformChannels = nw;
+		haveLastData = true;
+		dataChangedAt = now;
+		changesInRow++;
+		return false;
+	}
+
+	// a host may pulse faster than it refreshes its data, so a repeat is only stale once it has
+	// lasted a while - or straight away, when the host has said it is not playing
+
+	changesInRow = 0;
+	return ! playing || now - dataChangedAt >= kFrozenDataTime;
+}
+
+
 void		Engine::Pulse( const uint8_t ( *spectrum )[kSpectrumEntries], int spectrumChannels,
 						   const uint8_t ( *waveform )[kWaveformEntries], int waveformChannels,
 						   uint32_t position, double now )
@@ -161,6 +208,32 @@ void		Engine::Pulse( const uint8_t ( *spectrum )[kSpectrumEntries], int spectrum
 		spectrum = NULL;
 	if ( waveform && waveformChannels <= 0 )
 		waveform = NULL;
+
+	// Music keeps sending its last block of data, unchanged, while it is paused. Real audio is never
+	// identical from one pulse to the next for long, so data that has stopped changing counts as no
+	// data: the meters fall and the engine goes idle.
+
+	const uint8_t ( *hostSpectrum )[kSpectrumEntries] = spectrum;
+	const uint8_t ( *hostWaveform )[kWaveformEntries] = waveform;
+
+	dataFrozen = NoteData( spectrum, spectrumChannels, waveform, waveformChannels, now );
+
+	if ( dataFrozen )
+	{
+		// a frozen sound (rather than frozen silence) for a second means the host has paused,
+		// whether or not it said so
+
+		bool silent = spectrum? std::all_of( spectrum[0], spectrum[0] + kSpectrumEntries, []( uint8_t v ){ return v == 0; })
+							  : WaveformIsSilent( waveform[0] );
+
+		if ( playing && ! silent && now - dataChangedAt >= kPausedDataTime )
+			SetPlaying( false, now );
+
+		spectrum = NULL;
+		waveform = NULL;
+	}
+	else if ( ! playing && changesInRow >= 2 )
+		SetPlaying( true, now );		// activated part way through a track, or resumed without a play message
 
 	if ( playing )
 	{
@@ -215,7 +288,8 @@ void		Engine::Pulse( const uint8_t ( *spectrum )[kSpectrumEntries], int spectrum
 			rms[c] = SpectrumLevel( spectrum[ std::min( c, spectrumChannels - 1 ) ], 1.0 ) * ( kVUReferenceRMS / 0.3 );
 	}
 
-	vuFromWaveform = haveWaveform;
+	if ( ! dataFrozen )
+		vuFromWaveform = haveWaveform;
 
 	for ( int c = 0; c < 2; c++ )
 	{
@@ -232,7 +306,10 @@ void		Engine::Pulse( const uint8_t ( *spectrum )[kSpectrumEntries], int spectrum
 
 	pulses++;
 
-	if ( spectrum )
+	if ( dataFrozen )
+		frozenPulses++;
+
+	if ( hostSpectrum )
 	{
 		dataPulses++;
 
@@ -240,7 +317,7 @@ void		Engine::Pulse( const uint8_t ( *spectrum )[kSpectrumEntries], int spectrum
 
 		for ( int c = 0; c < 2; c++ )
 		{
-			const uint8_t* data = spectrum[ std::min( c, spectrumChannels - 1 ) ];
+			const uint8_t* data = hostSpectrum[ std::min( c, spectrumChannels - 1 ) ];
 
 			for ( int k = 0; k < kSpectrumEntries; k++ )
 			{
@@ -259,11 +336,17 @@ void		Engine::Pulse( const uint8_t ( *spectrum )[kSpectrumEntries], int spectrum
 			peakEntryVotes[best]++;
 	}
 
-	if ( haveWaveform )
+	if ( hostWaveform )
 	{
-		waveformPulses++;
-		waveformRMSSum[0] += rms[0];
-		waveformRMSSum[1] += rms[1];
+		const uint8_t* w0 = hostWaveform[0];
+		const uint8_t* w1 = hostWaveform[ std::min( 1, waveformChannels - 1 ) ];
+
+		if ( ! WaveformIsSilent( w0 ) || ! WaveformIsSilent( w1 ))
+		{
+			waveformPulses++;
+			waveformRMSSum[0] += WaveformRMS( w0 );
+			waveformRMSSum[1] += WaveformRMS( w1 );
+		}
 	}
 
 	double elapsed = now - windowStart;
@@ -272,6 +355,7 @@ void		Engine::Pulse( const uint8_t ( *spectrum )[kSpectrumEntries], int spectrum
 	{
 		pulseRate = pulses / elapsed;
 		dataRate = dataPulses / elapsed;
+		frozenRate = frozenPulses / elapsed;
 		frameRate = frames / elapsed;
 
 		for ( int c = 0; c < 2; c++ )
@@ -294,7 +378,7 @@ void		Engine::Pulse( const uint8_t ( *spectrum )[kSpectrumEntries], int spectrum
 		}
 
 		memset( peakEntryVotes, 0, sizeof( peakEntryVotes ));
-		pulses = dataPulses = frames = waveformPulses = 0;
+		pulses = dataPulses = frozenPulses = frames = waveformPulses = 0;
 		windowStart = now;
 	}
 }
@@ -444,7 +528,8 @@ std::vector<std::string>	Engine::DiagnosticLines() const
 	std::vector<std::string> lines;
 	char buf[256];
 
-	snprintf( buf, sizeof( buf ), "%.2f fps   pulses %.1f/s (%.1f/s with spectrum data)", frameRate, pulseRate, dataRate );
+	snprintf( buf, sizeof( buf ), "%.2f fps   pulses %.1f/s (%.1f/s with spectrum data, %.1f/s stale)  %s",
+			  frameRate, pulseRate, dataRate, frozenRate, playing? "playing" : "stopped" );
 	lines.push_back( buf );
 
 	// NumVersion: major is binary, minor and bug-fix are BCD nibbles

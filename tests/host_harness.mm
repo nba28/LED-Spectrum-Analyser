@@ -249,9 +249,25 @@ static double	Seconds()
 }
 
 
+static RenderVisualData	gRenderData;		// the last data sent
+
+
+static uint32_t		SendPulse( RenderVisualData* data, uint32_t rate )
+{
+	VisualPluginMessageInfo info;
+	memset( &info, 0, sizeof( info ));
+	info.u.pulseMessage.renderData = data;
+	info.u.pulseMessage.timeStampID = ++gTimeStamp;
+	info.u.pulseMessage.currentPositionInMS = gPosition;
+	info.u.pulseMessage.newPulseRateInHz = rate;
+	Send( kVisualPluginPulseMessage, &info );
+	return info.u.pulseMessage.newPulseRateInHz;
+}
+
+
 static void		Pulse( double t, double loudness )
 {
-	static RenderVisualData rd;
+	RenderVisualData& rd = gRenderData;
 
 	rd.numSpectrumChannels = 2;
 	rd.numWaveformChannels = 2;
@@ -274,15 +290,8 @@ static void		Pulse( double t, double loudness )
 		}
 	}
 
-	VisualPluginMessageInfo info;
-	memset( &info, 0, sizeof( info ));
-	info.u.pulseMessage.renderData = &rd;
-	info.u.pulseMessage.timeStampID = ++gTimeStamp;
-	info.u.pulseMessage.currentPositionInMS = gPosition;
-	info.u.pulseMessage.newPulseRateInHz = 60;
-
 	double before = Seconds();
-	Send( kVisualPluginPulseMessage, &info );
+	SendPulse( &rd, 60 );
 	gPulseTimes.push_back(( Seconds() - before ) * 1000.0 );
 }
 
@@ -548,17 +557,30 @@ int main( int argc, const char* argv[] )
 		EXPECT( [[d arrayForKey:@"user_presets"] count] == 1, "z saves a preset to the preferences" );
 		EXPECT( [[d dictionaryForKey:@"settings"][@"numberOfSpectrumBars"] isEqualToString:@"31"], "settings are saved to the preferences" );
 
+		// paused the way Music pauses: no stop message, and the last data repeated
+
+		Run( 0.5 );
+		uint32_t rate = 60;
+		for ( int i = 0; i < 400; i++ )
+		{
+			rate = SendPulse( &gRenderData, rate );
+			SpinRunLoop( 1.0 / 60 );
+		}
+		printf( "      pulse rate requested while the host repeats stale data: %u Hz\n", (unsigned) rate );
+		EXPECT( rate < 60, "a host repeating stale data is treated as paused" );
+
+		Run( 0.5 );
+		rate = SendPulse( &gRenderData, 60 );
+		EXPECT( rate == 60, "changing data resumes playback" );
+
 		// silence: the plug-in should settle and ask for fewer pulses
 
 		memset( &info, 0, sizeof( info ));
 		Send( kVisualPluginStopMessage, &info );
-		uint32_t rate = 60;
+		rate = 60;
 		for ( int i = 0; i < 400; i++ )
 		{
-			memset( &info, 0, sizeof( info ));
-			info.u.pulseMessage.newPulseRateInHz = rate;
-			Send( kVisualPluginPulseMessage, &info );
-			rate = info.u.pulseMessage.newPulseRateInHz;
+			rate = SendPulse( NULL, rate );
 			SpinRunLoop( 1.0 / 60 );
 		}
 		printf( "      idle pulse rate requested: %u Hz\n", (unsigned) rate );

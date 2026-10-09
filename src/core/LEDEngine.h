@@ -41,6 +41,8 @@ static const double kFadeTime				= 1.25;
 static const double kFeedbackTime			= 3.0;
 static const double kCoverBackgroundOpacity	= 0.33;
 static const int	kMaxPresets				= 10;
+static const double kFrozenDataTime			= 0.25;		// data unchanged for this long is not live audio
+static const double kPausedDataTime			= 1.0;		// ...and for this long, the host has paused
 
 
 struct CoverArtState
@@ -74,6 +76,7 @@ public:
 							   const uint8_t ( *waveform )[kWaveformEntries], int waveformChannels,
 							   uint32_t positionMS, double now );
 	void				NoteFrameDrawn( double now );
+	bool				DataIsFrozen() const	{ return dataFrozen; }	// the last pulse repeated stale data
 
 	// keyboard
 
@@ -131,6 +134,8 @@ private:
 	void				ResetMeters();
 	void				Toggle( bool* flag, const char* onText, const char* offText, double now, bool layoutAffected );
 	void				ToggleInfoField( int bit, const char* onText, const char* offText, double now );
+	bool				NoteData( const uint8_t ( *spectrum )[kSpectrumEntries], int spectrumChannels,
+								  const uint8_t ( *waveform )[kWaveformEntries], int waveformChannels, double now );
 
 	EngineHost*			host;
 	Settings			settings;
@@ -139,6 +144,15 @@ private:
 	BarMeter			vuBars[2];
 	NeedleMeter			needles[2];
 	bool				playing;
+
+	// the last data the host sent, to spot a host repeating it while paused
+
+	uint8_t				lastSpectrum[2][kSpectrumEntries];
+	uint8_t				lastWaveform[2][kWaveformEntries];
+	int					lastSpectrumChannels, lastWaveformChannels;
+	bool				haveLastData, dataFrozen;
+	double				dataChangedAt;
+	int					changesInRow;
 
 	TrackInfo			track;
 	double				textChangedAt;
@@ -172,11 +186,11 @@ private:
 	double				sampleRate;
 	uint32_t			audioChannels;
 	double				windowStart;
-	int					pulses, dataPulses, frames;
+	int					pulses, dataPulses, frozenPulses, frames;
 	double				spectrumSum[2], waveformRMSSum[2];
 	int					spectrumMax[2];
 	int					waveformPulses;
-	double				pulseRate, dataRate, frameRate, spectrumMean[2], waveformRMS[2];
+	double				pulseRate, dataRate, frozenRate, frameRate, spectrumMean[2], waveformRMS[2];
 	int					spectrumPeakEntry, peakEntryVotes[kSpectrumEntries];
 	bool				vuFromWaveform;
 };

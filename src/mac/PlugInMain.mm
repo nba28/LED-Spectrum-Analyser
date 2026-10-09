@@ -340,12 +340,17 @@ static NSString*	HostSettingsKey()
 			waveform = rd->waveformData;
 			nWaveform = MIN( (int) rd->numWaveformChannels, kVisualMaxDataChannels );
 		}
-
-		if ( ! engine->IsPlaying() && spectrum )
-			[self setPlaying:YES];		// we can be activated part way through a track
 	}
 
+	// the engine starts playing on its own when it is activated part way through a track, and
+	// stops when the host pauses but keeps sending its last data (as Music does)
+
+	BOOL wasPlaying = engine->IsPlaying();
+
 	engine->Pulse( spectrum, nSpectrum, waveform, nWaveform, msg->currentPositionInMS, now );
+
+	if ( engine->IsPlaying() != wasPlaying )
+		[self updateSleepAssertion];
 
 	if ( renderer )
 		[renderer updateAtTime:now];

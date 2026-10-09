@@ -589,6 +589,137 @@ static void TestEngineMeters()
 }
 
 
+// Music keeps sending its last block of data while paused; that must not hold the bars up
+
+static double MeanBar( const Engine& e )
+{
+	double sum = 0;
+	for ( int b = 0; b < e.Bands(); b++ )
+		sum += e.BarValue( 0, b );
+	return sum / e.Bands();
+}
+
+
+static void TestEngineFrozenData()
+{
+	uint8_t spec[2][kSpectrumEntries];
+	uint8_t zero[2][kSpectrumEntries];
+	FillSpectrum( zero, 0 );
+
+	// live music, then the host says it has stopped but repeats its last data
+
+	Engine e;
+	e.SetPlaying( true, 0 );
+	double t = 0;
+	for ( int i = 0; i < 60; i++, t += 1.0 / 60 )
+	{
+		FillSpectrum( spec, (uint8_t)( 180 + i % 7 ));
+		e.Pulse( spec, 2, NULL, 0, i * 16, t );
+	}
+	CHECK( MeanBar( e ) > 0.8 );
+	CHECK( ! e.DataIsFrozen());
+
+	e.SetPlaying( false, t );
+	for ( int i = 0; i < 600; i++, t += 1.0 / 60 )
+		e.Pulse( spec, 2, NULL, 0, 0, t );
+	CHECK( e.DataIsFrozen());
+	CHECK( ! e.IsPlaying());
+	CHECK_NEAR( MeanBar( e ), 0, 0 );
+	CHECK( e.BarPeak( 0, 3 ) == 0 );
+	CHECK( ! e.IsAnimating( t ));
+
+	// a host that pauses without saying so: the data freezes, the bars fall, the engine stops
+
+	Engine p;
+	p.SetPlaying( true, 0 );
+	t = 0;
+	for ( int i = 0; i < 60; i++, t += 1.0 / 60 )
+	{
+		FillSpectrum( spec, (uint8_t)( 180 + i % 7 ));
+		p.Pulse( spec, 2, NULL, 0, i * 16, t );
+	}
+	double pausedAt = t;
+	for ( ; t < pausedAt + kFrozenDataTime - 0.05; t += 1.0 / 60 )
+		p.Pulse( spec, 2, NULL, 0, 0, t );
+	CHECK( ! p.DataIsFrozen());		// a short repeat is still believed
+	CHECK( p.IsPlaying());
+	for ( ; t < pausedAt + kPausedDataTime + 0.1; t += 1.0 / 60 )
+		p.Pulse( spec, 2, NULL, 0, 0, t );
+	CHECK( p.DataIsFrozen());
+	CHECK( ! p.IsPlaying());
+	for ( ; t < pausedAt + 10; t += 1.0 / 60 )
+		p.Pulse( spec, 2, NULL, 0, 0, t );
+	CHECK_NEAR( MeanBar( p ), 0, 0 );
+
+	// ...and resumes, with the track info shown again, when the data changes
+
+	TrackInfo info;
+	info.title = "Where Them Girls At";
+	p.SetTrack( info, t - kTextDisplayTime - kFadeTime - 1 );
+	CHECK_NEAR( p.TextOpacity( t ), 0, 0 );
+	for ( int i = 0; i < 3; i++, t += 1.0 / 60 )
+	{
+		FillSpectrum( spec, (uint8_t)( 100 + i ));
+		p.Pulse( spec, 2, NULL, 0, 0, t );
+	}
+	CHECK( p.IsPlaying());
+	CHECK( ! p.DataIsFrozen());
+	CHECK_NEAR( p.TextOpacity( t ), 1, 0 );
+
+	// silence during playback is just silence: the engine keeps playing
+
+	Engine s;
+	s.SetPlaying( true, 0 );
+	for ( t = 0; t < 5; t += 1.0 / 60 )
+		s.Pulse( zero, 2, NULL, 0, 0, t );
+	CHECK( s.IsPlaying());
+
+	// a host that pulses faster than it refreshes its data is not frozen
+
+	Engine h;
+	h.SetPlaying( true, 0 );
+	t = 0;
+	for ( int i = 0; i < 600; i++, t += 1.0 / 60 )
+	{
+		FillSpectrum( spec, (uint8_t)( 200 + ( i / 2 ) % 5 ));
+		h.Pulse( spec, 2, NULL, 0, 0, t );
+		CHECK( ! h.DataIsFrozen());
+	}
+	CHECK( h.IsPlaying());
+	CHECK( MeanBar( h ) > 0.9 );
+
+	// the same applies to waveform data
+
+	uint8_t wave[2][kWaveformEntries];
+	for ( int i = 0; i < kWaveformEntries; i++ )
+		wave[0][i] = wave[1][i] = (uint8_t)( 128 + lround( 90 * sin( 2 * M_PI * i / 16.0 )));
+	Engine w;
+	w.SetPlaying( false, 0 );
+	for ( t = 0; t < 10; t += 1.0 / 60 )
+		w.Pulse( NULL, 0, wave, 2, 0, t );
+	CHECK( w.DataIsFrozen());
+	CHECK( ! w.IsPlaying());
+	CHECK( w.VUValue( 0 ) < 1e-3 );
+
+	// diagnostics still report what the host sends
+
+	std::vector<std::string> lines = e.DiagnosticLines();
+	CHECK( lines[0].find( "60.0/s with spectrum" ) != std::string::npos );
+	CHECK( lines[0].find( "/s stale" ) != std::string::npos );
+	CHECK( lines[0].find( "stopped" ) != std::string::npos );
+
+	// selecting a track, then playing it later, shows the info when it plays
+
+	Engine q;
+	q.SetTrack( info, 0 );
+	CHECK_NEAR( q.TextOpacity( 30 ), 0, 0 );
+	q.SetPlaying( true, 30 );
+	CHECK_NEAR( q.TextOpacity( 31 ), 1, 0 );
+	q.SetPlaying( true, 40 );		// already playing: no restart
+	CHECK_NEAR( q.TextOpacity( 30 + kTextDisplayTime + kFadeTime + 1 ), 0, 0 );
+}
+
+
 static void TestEngineTextAndArt()
 {
 	Engine e;
@@ -816,6 +947,7 @@ int main()
 	TestTrackText();
 	TestColours();
 	TestEngineMeters();
+	TestEngineFrozenData();
 	TestEngineTextAndArt();
 	TestEngineKeys();
 	TestPresets();

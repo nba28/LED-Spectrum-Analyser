@@ -69,6 +69,9 @@ Apple has never documented that data, so this version gives you the means to mea
   entry, as the host actually delivers them. Play the same track in both apps and compare.
 - **Spectrum Gain** (Options › Advanced) – scales the host's spectrum data. Settings are kept per app, so Music and
   iTunes can each have their own (presets are shared).
+- **Paused playback** – Music keeps sending its last block of audio data while it is paused, which held the bars
+  (and 3.0.7's) frozen near the top. Data that stops changing is now treated as silence, so the meters fall and the
+  plug-in goes idle when you pause.
 - The VU meters use the waveform data when the host supplies it (falling back to the spectrum otherwise), and have
   their own Gain knob, as in 3.0.7.
 
