@@ -20,6 +20,24 @@ of Graham's last release, **3.0.7**, for:
 Type `d` (or right-click) for the options; `=` shows diagnostics. The full manual, including every keyboard shortcut,
 is in [`resources/manual.html`](resources/manual.html) and opens from the right-click menu.
 
+## Screenshots
+
+Rendered by the test harness on CI ([`tests/host_harness.mm`](tests/host_harness.mm)). The CI machines have no GPU,
+so these are software renders: they show no perspective tilt, and where reflections are on (the cover art background
+shot) they are drawn solid instead of faded. In Music and iTunes the panels get 3.0.7's perspective and faded
+reflections, both on by default.
+
+| | |
+|---|---|
+| ![Side by side](docs/screenshots/01-side-by-side.jpg) | ![Back to back](docs/screenshots/02-back-to-back.jpg) |
+| Side by side (default layout) | Back to back |
+| ![Analogue VU](docs/screenshots/03-analogue-vu.jpg) | ![31 bands, text above](docs/screenshots/04-31-bands-text-above.jpg) |
+| Analogue VU meters | 31 bands, track info above |
+| ![Cover art](docs/screenshots/09-cover-art-centred.jpg) | ![Cover art background](docs/screenshots/10-cover-art-background.jpg) |
+| Cover art at the start of a track | …then as the background, with its colours |
+| ![Options](docs/screenshots/06-options-layout.jpg) | ![Diagnostics](docs/screenshots/05-diagnostics.jpg) |
+| Options window | `=` diagnostics |
+
 ## What this is, and how it relates to the originals
 
 Two versions of the original exist:
@@ -49,8 +67,8 @@ Apple has never documented that data, so this version gives you the means to mea
 
 - **`=` diagnostics overlay** – pulse rate, audio format, spectrum and waveform levels, and the loudest spectrum
   entry, as the host actually delivers them. Play the same track in both apps and compare.
-- **Spectrum Gain** (Options › Advanced) – scales the host's spectrum data. Settings are per app, so Music and
-  iTunes can each have their own.
+- **Spectrum Gain** (Options › Advanced) – scales the host's spectrum data. Settings are kept per app, so Music and
+  iTunes can each have their own (presets are shared).
 - The VU meters use the waveform data when the host supplies it (falling back to the spectrum otherwise), and have
   their own Gain knob, as in 3.0.7.
 

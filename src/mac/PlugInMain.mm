@@ -159,11 +159,27 @@ static Dictionary	DictionaryFromNSDictionary( NSDictionary* d )
 }
 
 
+// settings are kept per host app, so Music and iTunes can each have their own (Spectrum Gain in
+// particular); presets are shared. A host with no settings of its own starts from the shared ones.
+
+static NSString*	HostSettingsKey()
+{
+	NSString* host = NSBundle.mainBundle.bundleIdentifier;
+
+	return host.length? [@"settings." stringByAppendingString:host] : @"settings";
+}
+
+
 - (void)loadSettings
 {
 	loading = YES;
 
-	engine->GetSettings().FromDictionary( DictionaryFromNSDictionary( [defaults dictionaryForKey:@"settings"] ));
+	NSDictionary* stored = [defaults dictionaryForKey:HostSettingsKey()];
+
+	if ( stored == nil )
+		stored = [defaults dictionaryForKey:@"settings"];
+
+	engine->GetSettings().FromDictionary( DictionaryFromNSDictionary( stored ));
 
 	std::vector<Dictionary> presets;
 
@@ -181,7 +197,10 @@ static Dictionary	DictionaryFromNSDictionary( NSDictionary* d )
 	if ( engine == NULL || loading )
 		return;
 
-	[defaults setObject:NSDictionaryFromDictionary( engine->GetSettings().ToDictionary()) forKey:@"settings"];
+	NSDictionary* settings = NSDictionaryFromDictionary( engine->GetSettings().ToDictionary());
+
+	[defaults setObject:settings forKey:HostSettingsKey()];
+	[defaults setObject:settings forKey:@"settings"];		// the starting point for a host seen for the first time
 }
 
 
