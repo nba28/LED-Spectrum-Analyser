@@ -573,6 +573,38 @@ static void TestEngineMeters()
 	g.Pulse( spec, 2, NULL, 0, 0, 0 );
 	CHECK_NEAR( g.BarValue( 0, 0 ), 240.0 / 255.0, 1e-9 );
 
+	// host level: Music's data at twice iTunes' level, corrected by 0.5, reads the same as iTunes'
+
+	Engine it, mu;
+	mu.SetHostLevel( kMusicHostLevel );
+	uint8_t s1[2][kSpectrumEntries], s2[2][kSpectrumEntries];
+	uint8_t w1[2][kWaveformEntries], w2[2][kWaveformEntries];
+	for ( int k = 0; k < kSpectrumEntries; k++ )
+	{
+		s1[0][k] = s1[1][k] = (uint8_t)( 20 + ( k * 37 ) % 100 );
+		s2[0][k] = s2[1][k] = (uint8_t)( 2 * s1[0][k] );
+	}
+	for ( int n = 0; n < 30; n++ )
+	{
+		// the waveform's phase moves on each pulse, so the data never repeats
+
+		for ( int i = 0; i < kWaveformEntries; i++ )
+		{
+			int v = (int) lround( 40 * sin( 2 * M_PI * ( i + n ) / 16.0 ));
+			w1[0][i] = w1[1][i] = (uint8_t)( 128 + v );
+			w2[0][i] = w2[1][i] = (uint8_t)( 128 + 2 * v );
+		}
+		it.Pulse( s1, 2, w1, 2, 0, n / 60.0 );
+		mu.Pulse( s2, 2, w2, 2, 0, n / 60.0 );
+	}
+	for ( int b = 0; b < it.Bands(); b++ )
+		CHECK_NEAR( mu.BarValue( 0, b ), it.BarValue( 0, b ), 1e-9 );
+	CHECK( it.BarValue( 0, 3 ) > 0.3 );
+	CHECK( it.VUValue( 0 ) > 0.3 && it.NeedlePosition( 0 ) > 0.1 );
+	CHECK_NEAR( mu.VUValue( 0 ), it.VUValue( 0 ), 0.02 );		// waveform bytes round differently
+	CHECK_NEAR( mu.NeedlePosition( 0 ), it.NeedlePosition( 0 ), 0.02 );
+	CHECK( mu.DiagnosticLines()[5].find( "host level 0.50" ) != std::string::npos );
+
 	// diagnostics: one second of pulses
 
 	Engine d;

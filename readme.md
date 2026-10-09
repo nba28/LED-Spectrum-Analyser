@@ -61,17 +61,24 @@ under Rosetta), but only its binary survived. So this is a new implementation th
 
 ## Apple Music vs iTunes
 
-Both apps speak the same plug-in API (Apple's iTunes Visual SDK 2.0, message version 10.7), and the plug-in handles
-both identically. If the bars look different in Music than in iTunes 10.7, it is the data the host sends that differs.
-Apple has never documented that data, so this version gives you the means to measure and correct it:
+Both apps speak the same plug-in API (Apple's iTunes Visual SDK 2.0, message version 10.7), but they don't send the
+same data. Recording the same track in both (same files, volume, Sound Check and Sound Enhancer settings) showed two
+differences, which 3.0.7 has as well, and which this version corrects:
+
+- **Music's data is twice as loud.** Its spectrum and waveform data run about 2× (6 dB) above what iTunes sends,
+  which kept the bars near the top and the VU bargraphs pinned. In Music the plug-in halves the data, so both apps
+  look the same at the default settings. This is a measurement from screen recordings, not a documented figure;
+  the `=` overlay shows the correction in use ("host level").
+- **Music keeps sending data while paused.** It repeats its last block of audio data, which froze the bars where
+  they were. Data that stops changing is now treated as silence, so the meters fall and the plug-in goes idle when
+  you pause.
+
+To check or fine-tune:
 
 - **`=` diagnostics overlay** – pulse rate, audio format, spectrum and waveform levels, and the loudest spectrum
-  entry, as the host actually delivers them. Play the same track in both apps and compare.
-- **Spectrum Gain** (Options › Advanced) – scales the host's spectrum data. Settings are kept per app, so Music and
-  iTunes can each have their own (presets are shared).
-- **Paused playback** – Music keeps sending its last block of audio data while it is paused, which held the bars
-  (and 3.0.7's) frozen near the top. Data that stops changing is now treated as silence, so the meters fall and the
-  plug-in goes idle when you pause.
+  entry, as the host actually delivers them, plus how many pulses repeat stale data.
+- **Spectrum Gain** (Options › Advanced) – scales the bars and VU bargraphs on top of the correction. Settings are
+  kept per app, so Music and iTunes can each have their own (presets are shared).
 - The VU meters use the waveform data when the host supplies it (falling back to the spectrum otherwise), and have
   their own Gain knob, as in 3.0.7.
 

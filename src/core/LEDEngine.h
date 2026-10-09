@@ -41,6 +41,7 @@ static const double kFadeTime				= 1.25;
 static const double kFeedbackTime			= 3.0;
 static const double kCoverBackgroundOpacity	= 0.33;
 static const int	kMaxPresets				= 10;
+static const double kMusicHostLevel			= 0.5;		// Music's data runs 2x (6 dB) hotter than iTunes'
 static const double kFrozenDataTime			= 0.25;		// data unchanged for this long is not live audio
 static const double kPausedDataTime			= 1.0;		// ...and for this long, the host has paused
 
@@ -68,6 +69,8 @@ public:
 
 	void				SetHostInfo( const std::string& name, uint32_t appVersion, uint32_t apiMajor, uint32_t apiMinor );
 	void				SetAudioFormat( double sampleRate, uint32_t channels );
+	void				SetHostLevel( double level )	{ hostLevel = level; }	// scales the host's data to iTunes' level
+	double				HostLevel() const		{ return hostLevel; }
 	void				SetPlaying( bool isPlaying, double now );
 	bool				IsPlaying() const		{ return playing; }
 	void				SetTrack( const TrackInfo& info, double now );
@@ -144,6 +147,7 @@ private:
 	BarMeter			vuBars[2];
 	NeedleMeter			needles[2];
 	bool				playing;
+	double				hostLevel;
 
 	// the last data the host sent, to spot a host repeating it while paused
 

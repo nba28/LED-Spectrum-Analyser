@@ -521,6 +521,13 @@ static OSStatus	VisualPluginHandler( OSType message, VisualPluginMessageInfo* me
 				p->engine->SetHostInfo( StdString( host? host : NSProcessInfo.processInfo.processName ), packed,
 										messageInfo->u.initMessage.messageMajorVersion, messageInfo->u.initMessage.messageMinorVersion );
 
+				// Music's spectrum and waveform data are twice the level iTunes sends for the same
+				// track at the same settings (measured: same files, volume, Sound Check and Sound
+				// Enhancer), which held the bars near the top
+
+				if ( [[NSBundle mainBundle].bundleIdentifier isEqualToString:@"com.apple.Music"] )
+					p->engine->SetHostLevel( kMusicHostLevel );
+
 				messageInfo->u.initMessage.refCon = (void*) CFBridgingRetain( p );
 				break;
 			}

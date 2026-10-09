@@ -14,7 +14,7 @@ namespace led
 {
 
 Engine::Engine( EngineHost* theHost )
-	: host( theHost ), bandMap( 18 ), playing( false ), lastSpectrumChannels( 0 ), lastWaveformChannels( 0 ),
+	: host( theHost ), bandMap( 18 ), playing( false ), hostLevel( 1.0 ), lastSpectrumChannels( 0 ), lastWaveformChannels( 0 ),
 	  haveLastData( false ), dataFrozen( false ), dataChangedAt( -1e9 ), changesInRow( 0 ), textChangedAt( -1e9 ), savedInfoMask( kInfoTitle | kInfoArtist ),
 	  positionMS( 0 ), positionAt( 0 ), hasArtwork( false ), hasArtworkColours( false ), artworkAt( -1e9 ), artworkSerial( 0 ),
 	  paletteSerial( 1 ), animationStart( 0 ), randomSeed( 1 ), layoutSerial( 1 ), feedbackAt( -1e9 ), currentPreset( 0 ),
@@ -244,8 +244,10 @@ void		Engine::Pulse( const uint8_t ( *spectrum )[kSpectrumEntries], int spectrum
 	BarParams bp = { settings.expDecay, settings.barDecayTime, settings.peakHoldTime, settings.peakDecayTime };
 	BarParams vp = bp;
 
-	// spectrum bars
+	// spectrum bars. The host level brings every host's data to the level iTunes sends, which is
+	// what Graham calibrated against; the user's spectrum gain applies on top of that.
 
+	const double spectrumGain = settings.spectrumGain * hostLevel;
 	const int bands = bandMap.Bands();
 	double raw[kMaxBands];
 
@@ -254,7 +256,7 @@ void		Engine::Pulse( const uint8_t ( *spectrum )[kSpectrumEntries], int spectrum
 		if ( spectrum )
 		{
 			const uint8_t* data = spectrum[ std::min( c, spectrumChannels - 1 ) ];
-			BinSpectrum( data, bandMap, settings.spectrumGain, settings.binUsingPeak, raw );
+			BinSpectrum( data, bandMap, spectrumGain, settings.binUsingPeak, raw );
 		}
 		else
 			std::fill( raw, raw + bands, 0.0 );
@@ -276,7 +278,7 @@ void		Engine::Pulse( const uint8_t ( *spectrum )[kSpectrumEntries], int spectrum
 
 			if ( ! WaveformIsSilent( w ))
 				haveWaveform = true;
-			rms[c] = WaveformRMS( w );
+			rms[c] = WaveformRMS( w ) * hostLevel;
 		}
 	}
 
@@ -285,7 +287,7 @@ void		Engine::Pulse( const uint8_t ( *spectrum )[kSpectrumEntries], int spectrum
 		// the mean spectrum level of loud music sits around 0.3 - scale that to roughly 0 VU
 
 		for ( int c = 0; c < 2; c++ )
-			rms[c] = SpectrumLevel( spectrum[ std::min( c, spectrumChannels - 1 ) ], 1.0 ) * ( kVUReferenceRMS / 0.3 );
+			rms[c] = SpectrumLevel( spectrum[ std::min( c, spectrumChannels - 1 ) ], hostLevel ) * ( kVUReferenceRMS / 0.3 );
 	}
 
 	if ( ! dataFrozen )
@@ -553,9 +555,9 @@ std::vector<std::string>	Engine::DiagnosticLines() const
 			  vuFromWaveform? "waveform" : "spectrum (no waveform data)" );
 	lines.push_back( buf );
 
-	snprintf( buf, sizeof( buf ), "bands %d  response %s  binning %s  spectrum gain %.2f  VU gain %.2f",
+	snprintf( buf, sizeof( buf ), "bands %d  response %s  binning %s  spectrum gain %.2f  VU gain %.2f  host level %.2f",
 			  bandMap.Bands(), settings.logResponse? "log" : "linear", settings.binUsingPeak? "peak" : "average",
-			  settings.spectrumGain, settings.vuMeterGain );
+			  settings.spectrumGain, settings.vuMeterGain, hostLevel );
 	lines.push_back( buf );
 
 	return lines;
