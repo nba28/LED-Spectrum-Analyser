@@ -305,6 +305,7 @@ static NSFont*		BoldFont( CGFloat size )
 	CGImageRef			ledUnlit;
 	CGImageRef			artwork;
 
+	BOOL				coverOnTop;
 	std::string			shownText, shownElapsed, shownTotal, shownFeedback;
 	CGFloat				shownTextFontSize;
 }
@@ -473,8 +474,10 @@ static NSFont*		BoldFont( CGFloat size )
 	coverLayer.contents = (__bridge id) artwork;
 	coverLayer.contentsGravity = kCAGravityResizeAspect;
 	coverLayer.opacity = 0;
-	coverLayer.masksToBounds = YES;
+	coverLayer.shadowRadius = 14;
+	coverLayer.shadowOffset = CGSizeMake( 0, -4 );
 	[root addSublayer:coverLayer];
+	coverOnTop = NO;
 
 	// the display, inside a replicator whose centre line is the reflection axis
 
@@ -668,6 +671,7 @@ static NSFont*		BoldFont( CGFloat size )
 	textLayer.frame = CGRectMake( layout.textArea.x, layout.textArea.y, layout.textArea.w, layout.textArea.h );
 	[self addGlow:textLayer radius:layout.textFontSize * 0.22];
 	textLayer.opacity = 0;
+	textLayer.zPosition = 10;
 	[root addSublayer:textLayer];
 
 	// transient text
@@ -676,6 +680,7 @@ static NSFont*		BoldFont( CGFloat size )
 	feedbackLayer.alignmentMode = kCAAlignmentLeft;
 	feedbackLayer.frame = CGRectMake( layout.feedbackArea.x, layout.feedbackArea.y, layout.feedbackArea.w, layout.feedbackArea.h );
 	feedbackLayer.opacity = 0;
+	feedbackLayer.zPosition = 10;
 	[root addSublayer:feedbackLayer];
 
 	diagnosticsLayer = [CATextLayer layer];
@@ -692,6 +697,7 @@ static NSFont*		BoldFont( CGFloat size )
 	CGColorRelease( shade );
 	diagnosticsLayer.frame = CGRectMake( layout.diagnosticsArea.x, layout.diagnosticsArea.y, layout.diagnosticsArea.w, layout.diagnosticsArea.h );
 	diagnosticsLayer.hidden = YES;
+	diagnosticsLayer.zPosition = 10;
 	[root addSublayer:diagnosticsLayer];
 
 	builtLayoutSerial = engine->LayoutSerial();
@@ -855,6 +861,21 @@ static NSFont*		BoldFont( CGFloat size )
 									   full.size.height + ( centred.size.height - full.size.height ) * t );
 		coverLayer.contentsGravity = ( t > 0.5 )? kCAGravityResizeAspect : kCAGravityResizeAspectFill;
 		coverLayer.opacity = (float) cover.opacity;
+		
+		// shown in the centre, the artwork sits over the meters (just under the track info);
+		// as a background, behind everything. Reordering rather than zPosition works in every renderer
+		
+		BOOL onTop = ( t > 0.5 );
+		
+		if ( onTop != coverOnTop )
+		{
+			if ( onTop )
+				[root insertSublayer:coverLayer below:textLayer];
+			else
+				[root insertSublayer:coverLayer atIndex:0];
+			coverOnTop = onTop;
+		}
+		coverLayer.shadowOpacity = onTop? 0.6f : 0.0f;
 	}
 
 	// the reflection fade would hide a background image, so only use it on plain backgrounds

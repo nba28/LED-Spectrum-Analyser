@@ -487,35 +487,40 @@ int main( int argc, const char* argv[] )
 		EXPECT(( gRegistration.options & kVisualUsesSubview ) && ( gRegistration.options & kVisualWantsConfigure ), "uses a subview and offers options" );
 		EXPECT( gRegistration.numSpectrumChannels == 2 && gRegistration.numWaveformChannels == 2, "asks for stereo spectrum and waveform" );
 
-		// ---- session 1: the default look, then each layout ----
-
-		StartSession( @{ @"showProgress" : @"1", @"trackInfoMask" : @"3" } );
+		// ---- session 1: each layout. CI machines have no GPU, so the screenshots come from a
+		// software renderer that can't draw perspective or the reflection's fade; those are
+		// switched off here and exercised separately below ----
+		
+		StartSession( @{ @"showProgress" : @"1", @"trackInfoMask" : @"3", @"perspective" : @"0", @"reflections" : @"0" } );
 		Run( 1.5 );
 		Snapshot( @"01-side-by-side" );
-
+		
 		Key( @"x" );
 		Run( 1.0 );
 		Snapshot( @"02-back-to-back" );
-
+		
 		Key( @"x" );
 		Run( 1.5, 0.85 );
 		Snapshot( @"03-analogue-vu" );
-
+		
 		Key( @"x" );
-		Key( @"h" );		// perspective off
-		Key( @"f" );		// reflections off
 		Key( @"t" );		// track info above
 		Key( @"." );		// 24 bands
 		Key( @"." );		// 31 bands
 		Key( @"y" );		// add the year
 		Run( 1.0 );
-		Snapshot( @"04-flat-31-bands-text-above" );
-
+		Snapshot( @"04-31-bands-text-above" );
+		
 		Key( @"=" );		// diagnostics
 		Run( 1.2 );
 		Snapshot( @"05-diagnostics" );
 		Key( @"=" );
-
+		
+		Key( @"h" );		// perspective on
+		Key( @"f" );		// reflections on
+		Run( 1.0 );
+		Snapshot( @"11-perspective-and-reflections-software-render" );
+		
 		// options window
 
 		VisualPluginMessageInfo info;

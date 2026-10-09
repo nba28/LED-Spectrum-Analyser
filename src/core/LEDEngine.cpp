@@ -447,7 +447,9 @@ std::vector<std::string>	Engine::DiagnosticLines() const
 	snprintf( buf, sizeof( buf ), "%.2f fps   pulses %.1f/s (%.1f/s with spectrum data)", frameRate, pulseRate, dataRate );
 	lines.push_back( buf );
 
-	snprintf( buf, sizeof( buf ), "host: %s  version %X.%X.%X  plug-in API %u.%u", hostName.c_str(),
+	// NumVersion: major is binary, minor and bug-fix are BCD nibbles
+	
+	snprintf( buf, sizeof( buf ), "host: %s  version %u.%u.%u  plug-in API %u.%u", hostName.c_str(),
 			  ( hostVersion >> 24 ) & 0xFF, ( hostVersion >> 20 ) & 0x0F, ( hostVersion >> 16 ) & 0x0F, apiMajor, apiMinor );
 	lines.push_back( buf );
 
