@@ -93,7 +93,7 @@ static NSBitmapImageRep*	RenderWithCARenderer( CALayer* layer, int W, int H )
 		return nil;		// the layer belongs to the window's render context
 	
 	// full fidelity (3D transforms, replicators, shadows) using the OpenGL software renderer;
-	// CI machines have no GPU
+	// headless build machines have no GPU
 
 	CGLPixelFormatAttribute attrs[] =
 	{
@@ -496,7 +496,7 @@ int main( int argc, const char* argv[] )
 		EXPECT(( gRegistration.options & kVisualUsesSubview ) && ( gRegistration.options & kVisualWantsConfigure ), "uses a subview and offers options" );
 		EXPECT( gRegistration.numSpectrumChannels == 2 && gRegistration.numWaveformChannels == 2, "asks for stereo spectrum and waveform" );
 
-		// ---- session 1: each layout. CI machines have no GPU, so the screenshots come from a
+		// ---- session 1: each layout. Without a GPU the screenshots come from a
 		// software renderer that can't draw perspective or the reflection's fade; those are
 		// switched off here and exercised separately below ----
 		
