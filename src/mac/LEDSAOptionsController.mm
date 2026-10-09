@@ -103,10 +103,14 @@ enum
 {
 	// AppKit groups radio buttons that share a superview and an action, so each group gets its own
 	
-	NSButton* b = [self checkbox:title tag:tag x:x y:y];
-	b.buttonType = NSButtonTypeRadio;
-	b.action = groupAction;
+	NSButton* b = [NSButton radioButtonWithTitle:title target:self action:groupAction];
+	
+	b.tag = tag;
+	b.font = [NSFont systemFontOfSize:13];
 	[b sizeToFit];
+	[b setFrameOrigin:NSMakePoint( x, y )];
+	[currentPane addSubview:b];
+	controls[@( tag )] = b;
 	return b;
 }
 
@@ -334,7 +338,7 @@ enum
 	sg.toolTip = @"Scales the spectrum data supplied by iTunes / Music before it is displayed";
 	[self checkbox:@"Show Diagnostics [=]" tag:kTagDiagnostics x:16 y:350];
 
-	NSTextField* version = [self label:@"LED Spectrum Analyser version 3.1 (64-bit: Apple Silicon & Intel)\n©2014 Graham Cox; 64-bit port 2026"
+	NSTextField* version = [self label:@"LED Spectrum Analyser version 3.1 (64-bit)\n©2014 Graham Cox"
 									 x:16 y:390 width:276 size:10];
 	version.frame = NSMakeRect( 16, 390, 276, 30 );
 }

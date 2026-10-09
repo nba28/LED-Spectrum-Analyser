@@ -29,17 +29,25 @@ CGImageRef	LEDCreateProgressDotsImage( CGSize size, CGFloat scale, CGColorRef do
 
 // analogue VU meter geometry, shared by the face drawing and the needle
 
+// The scale is an arc centred well below the face; the needle pivots at the hub on the bottom
+// edge (as on the 3.0.7 meter), and is angled to point exactly at the scale position.
+
 typedef struct
 {
-	CGPoint		pivot;			// below the bottom edge of the face
+	CGPoint		scaleCentre;	// centre of the scale arc, below the face
 	CGFloat		scaleRadius;
+	CGFloat		scaleMaxAngle;	// radians either side of vertical, about scaleCentre
+	CGPoint		pivot;			// needle pivot, under the hub
 	CGFloat		needleLength;
-	CGFloat		maxAngle;		// radians either side of vertical
 } LEDMeterGeometry;
 
 LEDMeterGeometry	LEDMeterGeometryForSize( CGSize size );
 
-// rotation (radians, anticlockwise positive as Core Animation uses) for a needle position 0..1
+// angle of a scale position 0..1 about the scale centre, from vertical (positive = left)
+
+CGFloat		LEDMeterScaleAngle( LEDMeterGeometry g, double position );
+
+// needle rotation (radians, anticlockwise positive as Core Animation uses) for a position 0..1
 
 CGFloat		LEDMeterNeedleAngle( LEDMeterGeometry g, double position );
 

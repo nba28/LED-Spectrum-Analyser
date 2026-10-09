@@ -118,27 +118,36 @@ LEDMeterGeometry	LEDMeterGeometryForSize( CGSize size )
 {
 	LEDMeterGeometry g;
 	CGFloat h = size.height;
+	CGFloat bezel = MAX( 2.0, 0.028 * h );
 
-	g.pivot			= CGPointMake( size.width / 2, -0.35 * h );
+	g.scaleCentre	= CGPointMake( size.width / 2, -0.35 * h );
 	g.scaleRadius	= 0.98 * h;
-	g.needleLength	= 1.16 * h;
-	g.maxAngle		= 36.0 * M_PI / 180.0;
+	g.scaleMaxAngle	= 36.0 * M_PI / 180.0;
+	g.pivot			= CGPointMake( size.width / 2, bezel + 0.01 * h );
+	g.needleLength	= 0.80 * h;
 	return g;
+}
+
+
+CGFloat		LEDMeterScaleAngle( LEDMeterGeometry g, double position )
+{
+	position = MAX( -0.03, MIN( 1.1, position ));
+	return g.scaleMaxAngle * ( 1.0 - 2.0 * position );
+}
+
+
+// polar point around the scale centre; angle measured from vertical, positive to the left
+
+static CGPoint	Polar( LEDMeterGeometry g, CGFloat radius, CGFloat angleFromVertical )
+{
+	return CGPointMake( g.scaleCentre.x - radius * sin( angleFromVertical ), g.scaleCentre.y + radius * cos( angleFromVertical ));
 }
 
 
 CGFloat		LEDMeterNeedleAngle( LEDMeterGeometry g, double position )
 {
-	position = MAX( -0.03, MIN( 1.1, position ));
-	return g.maxAngle * ( 1.0 - 2.0 * position );
-}
-
-
-// polar point around the pivot; angle measured from vertical, positive to the left
-
-static CGPoint	Polar( LEDMeterGeometry g, CGFloat radius, CGFloat angleFromVertical )
-{
-	return CGPointMake( g.pivot.x - radius * sin( angleFromVertical ), g.pivot.y + radius * cos( angleFromVertical ));
+	CGPoint target = Polar( g, g.scaleRadius, LEDMeterScaleAngle( g, position ));
+	return atan2( -( target.x - g.pivot.x ), target.y - g.pivot.y );
 }
 
 
@@ -205,9 +214,9 @@ CGImageRef	LEDCreateMeterFaceImage( CGSize size, CGFloat scale )
 
 	LEDMeterGeometry g = LEDMeterGeometryForSize( size );
 	const double zeroDB = led::VUFractionForDB( 0 );
-	const CGFloat aStart = LEDMeterNeedleAngle( g, led::VUFractionForDB( -20 ));
-	const CGFloat aZero = LEDMeterNeedleAngle( g, zeroDB );
-	const CGFloat aEnd = LEDMeterNeedleAngle( g, 1.0 );
+	const CGFloat aStart = LEDMeterScaleAngle( g, led::VUFractionForDB( -20 ));
+	const CGFloat aZero = LEDMeterScaleAngle( g, zeroDB );
+	const CGFloat aEnd = LEDMeterScaleAngle( g, 1.0 );
 
 	// CG arcs are measured from +x, anticlockwise: angle-from-vertical a -> pi/2 + a
 
@@ -216,17 +225,17 @@ CGImageRef	LEDCreateMeterFaceImage( CGSize size, CGFloat scale )
 	SetStroke( ctx, 0.05, 0.04, 0.03 );
 	CGContextSetLineWidth( ctx, 0.022 * h );
 	CGContextBeginPath( ctx );
-	CGContextAddArc( ctx, g.pivot.x, g.pivot.y, g.scaleRadius, M_PI_2 + aStart, M_PI_2 + aZero, 1 );
+	CGContextAddArc( ctx, g.scaleCentre.x, g.scaleCentre.y, g.scaleRadius, M_PI_2 + aStart, M_PI_2 + aZero, 1 );
 	CGContextStrokePath( ctx );
 
 	// red overload band, thickening towards +3
 
 	SetFill( ctx, 0.93, 0.13, 0.06 );
 	CGContextBeginPath( ctx );
-	CGContextAddArc( ctx, g.pivot.x, g.pivot.y, g.scaleRadius + 0.011 * h, M_PI_2 + aZero, M_PI_2 + aEnd, 1 );
+	CGContextAddArc( ctx, g.scaleCentre.x, g.scaleCentre.y, g.scaleRadius + 0.011 * h, M_PI_2 + aZero, M_PI_2 + aEnd, 1 );
 	CGPoint inner = Polar( g, g.scaleRadius - 0.045 * h, aEnd );
 	CGContextAddLineToPoint( ctx, inner.x, inner.y );
-	CGContextAddArc( ctx, g.pivot.x, g.pivot.y, g.scaleRadius - 0.011 * h, M_PI_2 + aEnd, M_PI_2 + aZero, 0 );
+	CGContextAddArc( ctx, g.scaleCentre.x, g.scaleCentre.y, g.scaleRadius - 0.011 * h, M_PI_2 + aEnd, M_PI_2 + aZero, 0 );
 	CGContextClosePath( ctx );
 	CGContextFillPath( ctx );
 
@@ -248,7 +257,7 @@ CGImageRef	LEDCreateMeterFaceImage( CGSize size, CGFloat scale )
 
 	for ( size_t i = 0; i < sizeof( marks ) / sizeof( marks[0] ); i++ )
 	{
-		CGFloat a = LEDMeterNeedleAngle( g, led::VUFractionForDB( marks[i].db ));
+		CGFloat a = LEDMeterScaleAngle( g, led::VUFractionForDB( marks[i].db ));
 		BOOL red = ( marks[i].db > 0 ) || ( marks[i].db == 0 );
 		CGFloat len = marks[i].major? 0.13 * h : 0.075 * h;
 

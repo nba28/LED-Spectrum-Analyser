@@ -498,7 +498,7 @@ int main( int argc, const char* argv[] )
 		Snapshot( @"02-back-to-back" );
 
 		Key( @"x" );
-		Run( 1.2, 1.4 );
+		Run( 1.5, 0.85 );
 		Snapshot( @"03-analogue-vu" );
 
 		Key( @"x" );
