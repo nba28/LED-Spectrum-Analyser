@@ -30,9 +30,9 @@ LED Spectrum Analyser 3.0.7 as a 64-bit plug-in that runs natively on Apple Sili
 <h2>Installing</h2>
 <p>Quit Music (or iTunes). Copy <code>LED Spectrum Analyser.bundle</code> into
 <code>~/Library/iTunes/iTunes Plug-ins/</code> (the folder name is the same for Music; create it if it doesn't exist).
-Remove any older copy of LED Spectrum Analyser from that folder first. Then open Music, choose
-<b>Window &rsaquo; Visualizer</b> (or <b>View &rsaquo; Visualizer</b>), and pick LED Spectrum Analyser from the
-Visualizer menu.</p>
+Then open Music and choose <b>Window &rsaquo; Visualizer</b> (in iTunes, <b>View &rsaquo; Show Visualizer</b>),
+and pick LED Spectrum Analyser from the Visualizer menu. The original 3.0.7 can stay installed alongside; it is listed
+as &ldquo;LED Spectrum Analyser (3.0)&rdquo;. To remove a visualizer, move its bundle out of the folder.</p>
 <p>The bundle is universal. Apple Music on Apple Silicon uses the native arm64 code; iTunes 10.7 (for example as installed by
 Retroactive) runs it as x86_64 under Rosetta; Intel Macs run it natively.</p>
 <p>If macOS says the bundle is from an unidentified developer or damaged after downloading, remove the quarantine flag:
@@ -71,8 +71,8 @@ With the options window open, <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> select its 
 <tr><td>Decay</td><td><b>Exponential Decay</b> imitates an RC metering circuit; otherwise bars fall at a constant rate. <b>Peak Hold Time</b>, <b>Peak Decay Time</b> and <b>Bar Decay Time</b> set the ballistics.</td></tr>
 <tr><td>VU meters</td><td><b>VU Decay Time</b> sets the analogue needle's response (a real VU meter takes 300 ms); the <b>Gain</b> knob trims meters that read too high or low. The PEAK light shows the fastest peaks above 95% of full scale, held for half a second.</td></tr>
 <tr><td>Prevent Sleep</td><td>Keeps the display awake while the visualizer is showing and music is playing.</td></tr>
-<tr><td>Spectrum Gain</td><td><i>New in 3.1.</i> Scales the spectrum data from Music / iTunes before display. Use it if the bars sit higher or lower in one app than in the other; each app keeps its own setting.</td></tr>
-<tr><td>Diagnostics</td><td><i>New in 3.1.</i> Shows what the host is delivering: frame rate, pulse rate, audio format, spectrum and waveform levels.</td></tr>
+<tr><td>Spectrum Gain</td><td><i>New in 3.1.</i> Scales the bars and VU bargraphs. Music&rsquo;s data is already brought to iTunes&rsquo; level automatically, so this is only for fine-tuning; each app keeps its own setting.</td></tr>
+<tr><td>Diagnostics</td><td><i>New in 3.1.</i> Shows what the host is delivering: frame rate, pulse rate (and how many pulses repeat stale data), whether it is playing, audio format, spectrum and waveform levels, and the level correction in use.</td></tr>
 </table>
 
 <h2>Keyboard shortcuts</h2>
@@ -105,6 +105,9 @@ With the options window open, <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> select its 
 <p>The visualizer does not perform its own FFT; it works only with the 512-point, 8-bit spectrum and waveform data Music
 or iTunes supplies, so treat it as an attractive display rather than a measuring instrument. Bands are mapped onto that
 data exactly as LED Spectrum Analyser 2.x and 3.x did.</p>
+<p>Apple Music sends its spectrum and waveform data at about twice the level iTunes does, so in Music the visualizer
+halves it to match. Music also keeps sending its last block of data while paused; data that stops changing is treated
+as silence, so the meters fall when you pause.</p>
 
 <h2>Credits</h2>
 <p>LED Spectrum Analyser &copy; 1999&ndash;2014 Graham Cox (Apptree). Graham released the 2.x source before his site
